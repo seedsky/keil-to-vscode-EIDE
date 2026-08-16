@@ -1,0 +1,25 @@
+开发环境重建工具包 —— 新机器配置用
+====================================
+0. 先执行一次（放行 PowerShell 脚本，VSCode 终端必需）：
+     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+1. 开发环境重建指南.md   完整教程（步骤+原因+后果+完整配置，含 Keil 双版本共存）
+2. 1-安装扩展.bat         扩展管理（循环菜单：[1]只装缺失 [2]强制重装 [3]卸载 [0]退出）
+                          先展示 13 个扩展的已装/缺失状态，操作前确认；参数 -Mode status|auto|force|uninstall
+3. 2-自动配置.bat         EIDE/clangd 配置工具（循环菜单：[1]状态 [2]正常 [3]强制 [4]撤回 [5]清除 [6]全局clangd配置 [0]退出）
+                          必选：EIDE 设置（工具链路径、单击选中/双击打开等），写前自动备份
+                          [6] 为二级菜单：全局 clangd 配置（可选兜底）的状态/生成/删除，[0] 返回上级
+                          参数 -Mode status|auto|force|rollback|clean|global|global-status|global-write|global-rm
+                          -Root "D:\Keil5"
+                          写前自动备份到 %LOCALAPPDATA%\clangd\backup\
+4. 3-编码转换GBK转UTF8.bat 编码转换（复制到工程根运行；循环菜单：[1]状态 [2]转换 [3]还原 [4]清理 [0]退出）
+                          参数 -Mode status|convert|restore|clean；转换前自动备份 _gbk_backup\
+5. 4-一键检测.bat         环境检测（循环菜单：1-9 选择或组合如 1,4,7，[0]退出）
+                          每项附检测原理；参数 -Only "1,4,7"
+6. C51检测工程\            检测工程：覆盖 sbit/interrupt/_at_ 等疑难语法（检测脚本自动维护 .clangd）
+7. 示例代码\串口回显测试\  串口双向回显示例（自成体系：零外部依赖，函数全注释，带 README 和 .clangd）
+建议顺序：0 → 1 → 2 → 打开工程 → 4
+
+【新增】新建工程模板\ —— 已实测通过的 C51 工程骨架（复制改名即用，替代 EIDE 新建项目）。
+使用方法见该文件夹内 README.md，原理见指南 4.5 节。8. 检测工程配置.bat + 检测工程配置.ps1  工程配置检测：复制这两个文件到工程根目录，双击 bat
+                          逐项检测 工具链/目标名/文件注册/包含目录/.clangd/编码/编译数据库，
+                          每项给出状态、原因和解决方法，结尾汇总待修复清单

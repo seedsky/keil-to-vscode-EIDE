@@ -1,0 +1,55 @@
+version: "4.1"
+name: myproj
+type: C51
+deviceName: null
+packDir: null
+srcDirs:
+  - inc
+  - src
+virtualFolder:
+  name: <virtual_root>
+  files: []
+  folders:
+    - name: Source Group 1
+      files:
+        - path: STARTUP.A51
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: b03f89b7eb9bea861a41eb7d19ff3165
+targets:
+  Target 1:
+    cppPreprocessAttrs:
+      defineList: []
+      incList:
+        - inc
+        - D:/Keil5/C51/C51/INC/Atmel
+      libList: []
+    excludeList: []
+    settings:
+      debugger: unknown
+    toolchain: Keil_C51
+    toolchainConfigMap:
+      Keil_C51:
+        options:
+          version: 2
+          afterBuildTasks: []
+          asm-compiler: {}
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            optimization-level: level-8
+            optimization-type: SPEED
+          global:
+            ram-mode: SMALL
+            rom-mode: LARGE
+          linker:
+            misc-controls: ""
+            output-format: elf
+            remove-unused: true
+    uploadConfigMap:
+      Custom:
+        bin: ""
+        commandLine: ""
+        eraseChipCommand: ""
+    uploader: Custom
