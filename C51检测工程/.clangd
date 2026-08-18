@@ -1,139 +1,34 @@
-# ============================================================================
-# .clangd —— 工程级 clangd 配置（每个 EIDE 工程根目录放一份，随 Git 走）
-#
-# 【它解决什么问题】为什么没有它就不行？
-#   EIDE 生成的编译数据库（build\<目标名>\compile_commands.json）里的命令是
-#   Keil 私有语法（C51.exe ... INCDIR(...)），clangd 读不懂。
-#   这个文件负责告诉 clangd 四件事：
-#     ① Keil 关键字怎么翻译成 clangd 能懂的形式（宏，见 CompileFlags.Add）
-#     ② 头文件去哪找（-I 路径，见 CompileFlags.Add）
-#     ③ 编译数据库在哪（CompileFlags.CompilationDatabase）
-#     ④ 哪些 Keil 语法误报要压掉（Diagnostics.Suppress）
-#
-# 【生效方式】改完这个文件后：Ctrl+Shift+P → "clangd: Restart language server"
-# 【自检命令】在工程根目录打开终端跑：clangd --check=src/main.c
-#   看到 "All checks completed, 0 errors" = 配置正确
-#   看到 "config warning ... Unknown Config key" = 有键名/缩进写错（见 CompilationDatabase 注释）
-# ============================================================================
-
 CompileFlags:
-  # ---------- Add：给 clangd 追加的编译参数（宏翻译 + 头文件路径）----------
-
   Add:
-    # 错误数量上限调大：Keil 的 REGX52.H 里有 54 行 "sbit xxx = Px^N;"，
-    # 每一行都会产生一个被 Suppress 压掉的误报，而"被压掉的错误也计入上限"
-    # （默认上限 19）→ 不调大就会整屏只显示 "too many errors" 一条。100 够用。
     - -ferror-limit=100
-
-    # ---- 警告/误报全部压掉（Keil 代码风格与标准 C 不同，这些诊断没有参考价值）----
-    # ⚠️ -Wno-main 必须有：Keil 允许 "void main()"，clang 默认会报
-    #    "Return type of 'main' is not 'int'"（常见满屏红来源）
-    - -Wno-main
-    - -Wno-implicit-function-declaration  # 漏原型时 C99 会报 error，压掉（编译以 Keil 为准）
-    - -Wno-implicit-int
-    - -Wno-return-type
-    - -Wno-unused-function
-    - -Wno-unused-variable
-    - -Wno-unused-parameter
-    - -Wno-unused-label
-    - -Wno-unused-value
-    - -Wno-unknown-pragmas
-    - -Wno-unknown-attributes
-    - -Wno-unknown-argument
-    - -Wno-incompatible-pointer-types
-    - -Wno-builtin-declaration-mismatch
-    - -Wno-format
-    - -Wno-int-conversion
-    - -Wno-enum-conversion
-    - -Wno-macro-redefined
-    - -Wno-sign-compare
-    - -Wno-char-subscripts
-    # ---- Keil C51 关键字 → clangd 能懂的形式（宏翻译）----
-    # sbit / bit / sfr：Keil 特有类型，clangd 没有 → 用 char 承载。
-    # 为什么用 char 而不是 _Bool（重要）：
-    #   REGX52.H 里 "sfr P0 = 0x80;" 展开成 "char P0 = 0x80;" 是合法常量初始化；
-    #   若用 _Bool，0x80 转 _Bool 不是编译期常量 → 报 init_element_not_constant /
-    #   implicit-int。char 方案完全自足，不依赖全局配置
-    #   （全局配置只在路径含 \C51\ 的文件夹才生效，工程挪到别处就失效）。
-    - -Dsbit=char
-    - -Dbit=char
-    - -Dsfr=char
-    # sfr16 / s16（16 位寄存器，如 T2）：同上，用 int 承载
-    - -Dsfr16=int
-    - -Ds16=int
-    # code（程序存储器，如 "code unsigned char tab[]"）：内容是只读的 → const
-    - -Dcode=const
-    - -D__code=const
-    # data / xdata / idata / pdata（存储类型限定符）：对 clangd 无意义 → 清空
+    - -D__C51__
+    - -D__VSCODE_C51__
+    - -Dreentrant=
+    - -Dcompact=
+    - -Dsmall=
+    - -Dlarge=
     - -Ddata=
-    - -Dxdata=
     - -Didata=
     - -Dpdata=
-    # interrupt（中断函数）两种写法都要照顾：
-    #   "interrupt 4"（无括号，Keil 常用）函数宏处理不了 → 靠下面的 Suppress 压掉
-    #   "interrupt(4)"（带括号）→ 翻译成 __interrupt__(4)
-    - -Dinterrupt(x)=__interrupt__(x)
-    - -Dinterrupt=
-    - -DINTERRUPT(x)=__interrupt__(x)
-    # _at_（绝对定位，如 "unsigned char x _at_ 0x30;"）：翻译成属性
-    - -D_at_=__attribute__((at))
-    # using / REENTRANT 等 Keil 修饰符：清空即可
-    - -D_using(x)=
-    - -DREENTRANT=
-
-    # ---- 头文件搜索路径（-I）----
-    # Keil 标准头文件目录（REGX52.H、stdio.h 等）。
-    # ⚠️ 换机器 / 换盘符时改这两行，其余内容不用动。
-    - -ID:/Keil5/C51/C51/INC
-    # Atmel 系列芯片头文件目录（AT89C52.H 等）
-    - -ID:/Keil5/C51/C51/INC/Atmel
-    # 工程自己的头文件目录。两种拼写都写：EIDE 模板和旧教程两种都用过，
-    # 写全了不管工程用哪种都不会找不到。
-    # 注意：工程没有 include/ 目录时这行会静默忽略（找不到的目录无副作用）。
-    - -Iinc
-    - -Iinclude
-    # 互补路径（关键设计）：两条相对路径合起来覆盖两种解析模式——
-    #   -Iinc    有编译数据库时按 directory（=工程根）解析 → 工程根\inc ✓
-    #            （多级目录 src\app\main.c 也正确，因为基准是工程根）
-    #   -I../inc 没有数据库（还没编译过）时按文件所在目录解析：
-    #            src\main.c → src\..\inc = 工程根\inc ✓；inc\uart.c → 同理 ✓
-    # 前提与局限：-I../inc 只对"源码在工程根直接子目录（src\、inc\）"有效；
-    #            源码一旦嵌套更深（如 src\app\），它失效——此时靠上面的
-    #            CompilationDatabase 提供工程根基准（见下方说明）。
-    - -I../inc
-
-  # ---------- Remove：从编译数据库命令里删掉的参数（Keil 命令行 clangd 不认）----------
-
-  Remove:
-    - -m*        # 内存模型参数（SMALL/LARGE 等）
-    - -std=*     # 语言标准选择
-    - -f*        # 编译器功能开关
-    - -O*        # 优化参数
-    - -g*        # 调试信息参数
-    - -W*        # 警告参数（避免和上面 Add 里的 -Wno-* 冲突打架）
-    - -D__C51__  # Keil 预定义宏
-    - -D__CX51__ # Keil 预定义宏
-
-  # ---------- CompilationDatabase：编译数据库位置（全文件最容易写错的地方！）----------
-  #  1. 必须缩进在 CompileFlags: 下面（行首两个空格）——放顶层会被 clangd 当成
-  #     未知键直接无视，日志报 "Unknown Config key 'CompilationDatabase'"。
-  #  2. 路径 = build\<目标名>。目标名在 eide.yml 的 targets: 下面看：
-  #     普通工程默认 "Target 1"，SDCC 模板是 "Debug"。写错 = 找不到数据库。
-  #  3. 它到底有什么用（实测机制）：
-  #     Keil 工程的编译数据库命令（INCDIR(...) 语法）clangd 解析不了，
-  #     但它会采用记录里的 directory 字段（=工程根）作为相对路径基准，
-  #     于是上面的 -Iinc 才能正确解析成 工程根\inc —— 多级目录（src\app\）
-  #     全靠它。两级目录（src\、inc\）时 -I../inc 能兜底，注释掉这行也能工作，
-  #     但一旦源码嵌套更深、或想索引更准，这行就是必需——所以保留它。
-  CompilationDatabase: ./build/Target 1
-
+    - -Dbdata=
+    - -Dxdata=
+    - -Dcode=
+    - -Dbit=char
+    - -Dsbit=char
+    - -Dsfr=char
+    - -Dsfr16=int
+    - -Dsfr32=int
+    - -Dinterrupt(x)=
+    - -Dusing(x)=
+    - -D_at_(x)=
+    - -D_priority_(x)=
+    - -D_task_(x)=
+    - -ID:\Keil5\C51\C51\INC\Atmel
+    - -ID:\Keil5\C51\C51\INC
+  Remove: []
 Diagnostics:
-  # ---------- Suppress：抑制 Keil 特有语法的误报 ----------
-  # 注意：被压掉的报错仍然计入 ferror-limit，所以上面才要调到 100。
   Suppress:
-    - expected_fn_body                        # "interrupt 1" 无括号形式产生的误报
-    - invalid_token_after_toplevel_declarator # "_at_ 0x30" 无括号形式产生的误报
-    - unknown_type                            # 未识别的类型名
-    - unknown_typename                        # 同上（不同 clangd 版本用词不同，都写上）
-    - redefinition_different_typedef          # Keil stdio.h 的 size_t 与 clang 内置类型冲突（printf 必触发）
-    - init_element_not_constant               # "sbit x = P^N;" / "_at_ 0x30" 的非常量初始化误报
+    - init_element_not_constant
+    - redefinition_different_typedef
+    - expected_fn_body
+    - invalid_token_after_toplevel_declarator

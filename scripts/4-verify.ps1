@@ -17,12 +17,20 @@ function Check([string]$name, [bool]$ok, [string]$detail = "", [string]$why = ""
     if ($why) { Write-Host ("          目的：{0}" -f $why) -ForegroundColor DarkGray }
 }
 
+# JSONC 容错解析：VSCode 的 settings.json 可能被设置 UI 写成带尾逗号/注释的 JSONC，
+# PowerShell 的 ConvertFrom-Json 不认——这里先去掉行首 // 注释和尾逗号再解析（纯 JSON 也能过）
+function ConvertFrom-JsonC([string]$text) {
+    $t = [regex]::Replace($text, '(?m)^\s*//[^\r\n]*', '')   # 去整行 // 注释
+    $t = [regex]::Replace($t, ',(\s*[}\]])', '$1')            # 去尾逗号（},\n 或 ],\n）
+    return $t | ConvertFrom-Json
+}
+
 # ---------------- Keil 安装目录查询（与 2-setup 同一套逻辑） ----------------
 function Get-KeilPaths {
     $r = @{ C51 = $null; MDK = $null; GNU = $null }
     $settingsPath = Join-Path $env:APPDATA "Code\User\settings.json"
     if (Test-Path $settingsPath) {
-        $s = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $s = ConvertFrom-JsonC (Get-Content $settingsPath -Raw -Encoding UTF8)
         if ($s.'EIDE.C51.INI.Path') {
             $ini = $s.'EIDE.C51.INI.Path'
             if ($ini -match "TOOLS\.INI$" -and (Test-Path $ini)) {
@@ -94,13 +102,16 @@ function Run-Section([int]$id) {
             Write-Host ""
             Write-Host "============== 2. 用户设置 ==============" -ForegroundColor Cyan
             Write-Host "  原理：检查 settings.json 关键键值是否符合推荐配置。" -ForegroundColor DarkGray
+            Write-Host "  说明：下面每项 = settings.json 的一个键；VSCode 里改设置会写回这个文件。" -ForegroundColor DarkGray
             $settingsPath = Join-Path $env:APPDATA "Code\User\settings.json"
             if (Test-Path $settingsPath) {
-                $settings = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $settings = ConvertFrom-JsonC (Get-Content $settingsPath -Raw -Encoding UTF8)
                 Check "files.autoGuessEncoding = true" ($settings.'files.autoGuessEncoding' -eq $true) "设置为 true" "打开文件自动识别编码，GBK/UTF-8 都不乱码"
                 Check "clangd.arguments 已配" ($null -ne $settings.'clangd.arguments') "补充 clangd.arguments" "clangd 启动参数（不自动插#include、后台索引提速）"
                 Check "editor.renderWhitespace = all" ($settings.'editor.renderWhitespace' -eq "all") "设置为 all" "空格显示为点、Tab 为箭头，缩进一眼看清"
                 Check "chat.disableAIFeatures = true" ($settings.'chat.disableAIFeatures' -eq $true) "设置为 true" "关闭 VSCode 内置 AI，界面干净、不干扰"
+                Check "editor.formatOnSave/formatOnType（[c] 语言级）" (($settings.'[c]'.'editor.formatOnSave' -eq $true) -and ($settings.'[c]'.'editor.formatOnType' -eq $true)) "在 [c] 语言块内设置" "保存时格式化 + 回车后自动缩进/对齐（打 ; 不触发是 clangd 能力边界）"
+                Check "editor.formatOnPaste = true" ($settings.'editor.formatOnPaste' -eq $true) "设置为 true" "粘贴时自动格式化（可选，粘贴的代码自动排版）"
                 Check "EIDE.DisplayLanguage = zh-cn" ($settings.'EIDE.DisplayLanguage' -eq "zh-cn") "设置为 zh-cn" "EIDE 插件界面中文化"
                 Check "EIDE.Option.EnableClangdConfigGenerator = false" ($settings.'EIDE.Option.EnableClangdConfigGenerator' -eq $false) "设置为 false" "防止 EIDE 自动生成 .clangd 覆盖手写配置"
                 Check "文件/文件夹 单击选中双击打开" (($settings.'workbench.list.openMode' -eq "doubleClick") -and ($settings.'workbench.tree.expandMode' -eq "doubleClick")) "设置为 doubleClick" "资源管理器单击只选中、双击才打开/展开，避免误触"
@@ -114,7 +125,7 @@ function Run-Section([int]$id) {
             $kbPath = Join-Path $env:APPDATA "Code\User\keybindings.json"
             if (Test-Path $kbPath) {
                 $kb = Get-Content $kbPath -Raw -Encoding UTF8
-                Check "Ctrl+Alt+L 格式化" ($kb -match "ctrl\+alt\+l") "加入该绑定" "手动格式化快捷键（C 文件关闭了自动格式化，靠它）"
+                Check "Ctrl+Alt+L 格式化" ($kb -match "ctrl\+alt\+l") "加入该绑定" "手动格式化快捷键（自动格式化之外，随时手动排版整份文件）"
             } else { Check "keybindings.json 存在" $false "未找到 $kbPath" "快捷键绑定的存放文件" }
         }
 
@@ -216,7 +227,7 @@ Diagnostics:
             $clangd = $null
             $settingsPath = Join-Path $env:APPDATA "Code\User\settings.json"
             if (Test-Path $settingsPath) {
-                $s = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $s = ConvertFrom-JsonC (Get-Content $settingsPath -Raw -Encoding UTF8)
                 if ($s.'clangd.path' -and (Test-Path $s.'clangd.path')) { $clangd = $s.'clangd.path' }
             }
             if (-not $clangd) {
