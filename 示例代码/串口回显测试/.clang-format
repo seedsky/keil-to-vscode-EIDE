@@ -1,0 +1,29 @@
+# ============================================================
+# .clang-format —— 格式化风格（Visual Studio 风格，随 Git 走）
+#
+# 作用：VSCode 保存时自动格式化（formatOnSave）按本文件排版。
+#
+# 风格：Visual Studio —— 大括号另起一行 + 4 空格缩进 + 不折行。
+#   这就是微软 C/C++ 扩展默认的 clang_format_fallbackStyle 参数
+#   （UseTab: Never, IndentWidth: 4, BreakBeforeBraces: Allman,
+#    IndentCaseLabels: false, ColumnLimit: 0, AccessModifierOffset: -4）。
+#
+# 注意：VSCode 对 C 语言没有内置格式化器——无论 clangd 还是微软
+#   C/C++ 扩展，底层用的都是同一个 clang-format，只是风格参数不同；
+#   所以本文件 = VS 风格，效果和你印象中的"VSCode 默认"一致。
+#
+# 前提：源码已是 UTF-8 无 BOM（格式化只调空白、不碰编码，不会损坏中文注释）
+# 想改风格：https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+# ============================================================
+BasedOnStyle: LLVM
+UseTab: Never                        # 用空格缩进（VS 风格，不用制表符）
+IndentWidth: 4                       # 缩进 4 个空格
+TabWidth: 4
+BreakBeforeBraces: Allman            # 大括号另起一行（VS 风格）
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+ColumnLimit: 0                       # 不自动折行
+SortIncludes: false                  # 不重排 #include 顺序
+ReflowComments: false                # 不重排注释（保护中文注释排版）
+AlignTrailingComments: false         # 行尾注释不对齐（保护中文）
+MaxEmptyLinesToKeep: 2
