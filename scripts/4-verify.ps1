@@ -185,44 +185,18 @@ function Run-Section([int]$id) {
             Write-Host "        sbit/_at_/interrupt/stdio 全部疑难语法，0 诊断 = 配置全生效。" -ForegroundColor DarkGray
             if (-not $script:keilInc) { $paths = Get-KeilPaths; $script:keilInc = $paths.C51; if (-not $script:keilInc) { $script:keilInc = "D:\Keil5\C51\C51\INC" } }
             $proj = Join-Path $PSScriptRoot "..\C51检测工程"
-            # 按检测到的 Keil 路径重新生成检测工程的 .clangd（换机器也能测）
-            $clangdCfg = @"
-CompileFlags:
-  Add:
-    - -ferror-limit=100
-    - -D__C51__
-    - -D__VSCODE_C51__
-    - -Dreentrant=
-    - -Dcompact=
-    - -Dsmall=
-    - -Dlarge=
-    - -Ddata=
-    - -Didata=
-    - -Dpdata=
-    - -Dbdata=
-    - -Dxdata=
-    - -Dcode=
-    - -Dbit=char
-    - -Dsbit=char
-    - -Dsfr=char
-    - -Dsfr16=int
-    - -Dsfr32=int
-    - -Dinterrupt(x)=
-    - -Dusing(x)=
-    - -D_at_(x)=
-    - -D_priority_(x)=
-    - -D_task_(x)=
-    - -I$($script:keilInc)\Atmel
-    - -I$($script:keilInc)
-  Remove: []
-Diagnostics:
-  Suppress:
-    - init_element_not_constant
-    - redefinition_different_typedef
-    - expected_fn_body
-    - invalid_token_after_toplevel_declarator
-"@
-            [System.IO.File]::WriteAllText((Join-Path $proj ".clangd"), $clangdCfg, [System.Text.UTF8Encoding]::new($false))
+            # 检测工程的 .clangd 统一用「常用文件」标准版（不内置旧配置，避免版本漂移）：
+            # 缺失或不是标准版（缺 -Wno-main）时从「常用文件」复制
+            $stdClangd = Join-Path (Join-Path $PSScriptRoot "..") "常用文件\.clangd"
+            $projClangd = Join-Path $proj ".clangd"
+            $needStd = -not (Test-Path $projClangd)
+            if (-not $needStd -and (Test-Path $projClangd)) {
+                $pc = Get-Content $projClangd -Raw -Encoding UTF8
+                if ($pc -notmatch '-Wno-main') { $needStd = $true }
+            }
+            if ($needStd -and (Test-Path $stdClangd)) {
+                Copy-Item $stdClangd $projClangd -Force
+            }
 
             $clangd = $null
             $settingsPath = Join-Path $env:APPDATA "Code\User\settings.json"

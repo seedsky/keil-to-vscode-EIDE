@@ -45,7 +45,7 @@ function Restore-Backup {
         Copy-Item (Join-Path $backupDir "config.yaml.bak") $cfgPath -Force
         Write-Host "  已恢复 config.yaml" -ForegroundColor Green; $n++
     }
-    if ($n -eq 0) { Write-Host "  没有可撤回的备份（$backupDir 为空）" -ForegroundColor Yellow }
+    if ($n -eq 0) { Write-Host "  没有可撤回的备份（$backupDir 为空或备份被手动删除）——无法复原，只能重新配置" -ForegroundColor Yellow }
 }
 
 # ---------------- Keil 安装目录查询 ----------------

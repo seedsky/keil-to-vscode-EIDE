@@ -113,17 +113,27 @@ else {
         "右键工程名 → 添加目录 → 选 $($unregistered -join '、')；或 eide.yml 的 srcDirs 加上。不注册 = 该目录 .c 不编译 = 链接报 L127 UNRESOLVED（?C_START）"
 }
 
-# ---------- [5] 包含目录 ----------
+# ---------- [5] 包含目录（只检"必要项"，不假设工程有什么头文件）----------
 $incList = Get-ListAfter $ymlLines "incList"
-$hasInc = $incList | Where-Object { $_ -match '(^|/)inc$|^inc$' }
 $hasAtmel = $incList | Where-Object { $_ -match 'Atmel' }
-if ($hasInc -and $hasAtmel) {
-    Show-Check "包含目录" $true "incList 含 inc 和 Atmel：$($incList -join '; ')" ""
+# 必要项 1：Atmel —— REGX52.H 等 Keil 标准头文件所在目录，任何工程 #include <REGX52.H> 都依赖它
+# 必要项 2：工程自己的头文件目录（inc/ 或 include/）——前提是工程真的存在这个目录；
+#           工程没有 inc/ 就不要求（不预测具体头文件，如 uart.h 是否存在不是脚本该管的）
+$hasIncDir = Test-Path (Join-Path $root "inc")
+$hasIncludeDir = Test-Path (Join-Path $root "include")
+$ownIncOk = (-not $hasIncDir -and -not $hasIncludeDir) -or
+            ($hasIncDir -and ($incList | Where-Object { $_ -match '(^|/)inc$|^inc$' })) -or
+            ($hasIncludeDir -and ($incList | Where-Object { $_ -match 'include' }))
+if ($hasAtmel -and $ownIncOk) {
+    Show-Check "包含目录" $true "必要路径齐全（Atmel ✓；工程头文件目录 ✓）：$($incList -join '; ')" ""
 }
 else {
     $need = @()
-    if (-not $hasInc) { $need += "inc（工程自己的头文件目录，缺它 #include ""uart.h"" 报 can't open file）" }
-    if (-not $hasAtmel) { $need += "D:/Keil5/C51/C51/INC/Atmel（REGX52.H 所在，缺它报 can't open file 'REGX52.H' + 16 个 undefined）" }
+    if (-not $hasAtmel) { $need += "D:/Keil5/C51/C51/INC/Atmel（REGX52.H 等 Keil 标准头文件所在目录，缺它任何 #include <REGX52.H> 都报 can't open file + 16 个 undefined）" }
+    if (-not $ownIncOk) {
+        if ($hasIncDir) { $need += "inc（工程有 inc\ 目录但没注册进包含目录——你放在里面的头文件编译时找不到）" }
+        if ($hasIncludeDir) { $need += "include（工程有 include\ 目录但没注册进包含目录）" }
+    }
     Show-Check "包含目录" $false "incList = [$($incList -join ', ')]，缺：$($need -join '；')" `
         "右键工程名 → 项目设置 → 找到「包含目录」（不是「库搜索目录」！）→ 添加缺失项。注意：REGX52.H 住在 Keil5\C51\C51\INC\Atmel\ 子目录，不加 Atmel 必报错"
 }
@@ -140,11 +150,12 @@ else {
     $indentOk = $cld -match '(?m)^\s{2}CompilationDatabase:'
     # 目标名匹配：cdb 路径里的目标名 == eide.yml 的目标名（缩进正确才读取，否则无意义）
     $cdbLine = if ($indentOk -and $cld -match '(?m)^\s{2}CompilationDatabase:\s*(.+)\r?$') { $Matches[1].Trim() } else { "" }
+    if ($cdbLine) { $cdbLine = $cdbLine -replace '\s*#.*$', '' }   # 去掉行尾注释（# 后面的内容）
     $cdbTargetOk = $false
     if ($cdbLine) {
-        $cdbTarget = [regex]::Match($cdbLine, '/([^/]+)$').Groups[1].Value
+        # 兼容正/反斜杠分隔：./build/Target 1 或 .\build\Target 1 都取最后一段
+        $cdbTarget = [regex]::Match($cdbLine, '[/\\]([^/\\]+)$').Groups[1].Value.Trim()
         if ($cdbTarget -eq $target) { $cdbTargetOk = $true }
-        elseif ($target -eq "Target 1" -and $cdbTarget -eq "Target 1") { $cdbTargetOk = $true }
     }
     $macroOk  = $cld -match '-Dsbit=char' -and $cld -match '-Dsfr=char' -and $cld -match '-Dcode=const'
     $incOk    = $cld -match '-Iinc' -and $cld -match '-I\.\./inc'
@@ -204,6 +215,7 @@ else {
                 $text = ($out -join "`r`n")
                 [System.IO.File]::WriteAllText($clangdFile, $text, (New-Object System.Text.UTF8Encoding($false)))
                 Write-Host "  ✓ 已修正：CompilationDatabase: ./build/$newTarget（原文件备份为 .clangd.bak）" -ForegroundColor Green
+                Write-Host "  复原方法：把 .clangd.bak 复制回 .clangd 即可撤销本次修正（备份若被删除则无法复原）" -ForegroundColor DarkGray
                 Write-Host "  下一步：Ctrl+Shift+P → clangd: Restart language server 后重新检测" -ForegroundColor DarkGray
             }
             else {

@@ -95,7 +95,7 @@ function Restore-Now {
     Write-Host "==================== 还原上次转换 ====================" -ForegroundColor Cyan
     Write-Host "  从最新一份备份恢复 GBK 原文（撤销转换）。" -ForegroundColor DarkGray
     $dirs = Get-ChildItem $backupRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
-    if (-not $dirs) { Write-Host "  没有可还原的备份（_gbk_backup 不存在或为空）" -ForegroundColor Yellow; return }
+    if (-not $dirs) { Write-Host "  没有可还原的备份（_gbk_backup 不存在、为空或被手动删除）——无法还原，只能重新转换" -ForegroundColor Yellow; return }
     Write-Host ("  备份来源: {0}" -f $dirs[0].FullName)
     if (-not $script:NI) {
         $y = Get-Input "  确认还原？(Y/n，回车=还原)"
