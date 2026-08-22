@@ -110,7 +110,7 @@ function Run-Section([int]$id) {
                 Check "clangd.arguments 已配" ($null -ne $settings.'clangd.arguments') "补充 clangd.arguments" "clangd 启动参数（不自动插#include、后台索引提速）"
                 Check "editor.renderWhitespace = all" ($settings.'editor.renderWhitespace' -eq "all") "设置为 all" "空格显示为点、Tab 为箭头，缩进一眼看清"
                 Check "chat.disableAIFeatures = true" ($settings.'chat.disableAIFeatures' -eq $true) "设置为 true" "关闭 VSCode 内置 AI，界面干净、不干扰"
-                Check "editor.formatOnSave/formatOnType（[c] 语言级）" (($settings.'[c]'.'editor.formatOnSave' -eq $true) -and ($settings.'[c]'.'editor.formatOnType' -eq $true)) "在 [c] 语言块内设置" "保存时格式化 + 回车后自动缩进/对齐（打 ; 不触发是 clangd 能力边界）"
+                Check "格式化开关（[c] 语言级）" (($settings.'[c]'.'editor.formatOnSave' -eq $true) -and ($settings.'[c]'.'editor.formatOnType' -eq $false)) "formatOnSave=true + formatOnType=false" "保存时整文件格式化开启；输入时格式化禁用（clangd 回车格式化实测有 bug：局部重排+乱加空格）"
                 Check "editor.formatOnPaste = true" ($settings.'editor.formatOnPaste' -eq $true) "设置为 true" "粘贴时自动格式化（可选，粘贴的代码自动排版）"
                 Check "EIDE.DisplayLanguage = zh-cn" ($settings.'EIDE.DisplayLanguage' -eq "zh-cn") "设置为 zh-cn" "EIDE 插件界面中文化"
                 Check "EIDE.Option.EnableClangdConfigGenerator = false" ($settings.'EIDE.Option.EnableClangdConfigGenerator' -eq $false) "设置为 false" "防止 EIDE 自动生成 .clangd 覆盖手写配置"
